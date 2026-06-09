@@ -601,8 +601,8 @@ const TABLE = 'contacts';
 // 앱 비밀번호 (클라이언트 체크용)
 const APP_PASSWORD = 'cellphone1!';
 
-// Anthropic API 키 (명함 스캔용) — https://console.anthropic.com 에서 발급
-const ANTHROPIC_API_KEY = 'YOUR_ANTHROPIC_API_KEY';
+// Google Cloud Vision API 키 (명함 스캔용) — 아래 가이드 참고
+const GOOGLE_VISION_KEY = 'YOUR_GOOGLE_VISION_API_KEY';
 
 // ══════════════════════════════════════
 //  동의어 사전
@@ -909,8 +909,8 @@ async function confirmDelete() {
 //  명함 스캔
 // ══════════════════════════════════════
 function triggerScan() {
-  if (ANTHROPIC_API_KEY === 'YOUR_ANTHROPIC_API_KEY') {
-    toast('ANTHROPIC_API_KEY를 코드에 입력해 주세요.', 'error');
+  if (GOOGLE_VISION_KEY === 'YOUR_GOOGLE_VISION_API_KEY') {
+    toast('GOOGLE_VISION_KEY를 코드에 입력해 주세요.', 'error');
     return;
   }
   document.getElementById('card-input').click();
@@ -949,7 +949,7 @@ async function onCardSelected(event) {
     document.getElementById('scan-error').style.display = 'none';
 
     try {
-      const result = await callClaudeVision(base64, mediaType);
+      const result = await callGoogleVision(base64);
       fillScanForm(result);
       document.getElementById('scan-spinner').style.display = 'none';
       document.getElementById('scan-result').style.display = 'block';
@@ -963,49 +963,88 @@ async function onCardSelected(event) {
   reader.readAsDataURL(file);
 }
 
-async function callClaudeVision(base64, mediaType) {
-  const prompt = `이 명함 이미지에서 연락처 정보를 추출해서 아래 JSON 형식으로만 응답해주세요.
-없는 항목은 빈 문자열로 두세요.
-{
-  "company": "업체명",
-  "name": "담당자 이름",
-  "title": "직함/직위",
-  "phone": "대표 전화번호 (휴대폰 우선)",
-  "email": "이메일",
-  "note": "기타 특이사항 (있을 경우만)"
-}
-JSON만 출력하고 다른 텍스트는 쓰지 마세요.`;
+async function callGoogleVision(base64) {
+  const res = await fetch(
+    `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          image: { content: base64 },
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION' }]
+        }]
+      })
+    }
+  );
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-client-side-api-key-access': 'my-application',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-          { type: 'text', text: prompt }
-        ]
-      }]
-    })
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err);
-  }
+  if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
-  const text = data.content[0].text.trim();
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('JSON 파싱 실패');
-  return JSON.parse(jsonMatch[0]);
+
+  if (data.responses[0]?.error) {
+    throw new Error(data.responses[0].error.message);
+  }
+
+  const fullText = data.responses[0]?.fullTextAnnotation?.text || '';
+  if (!fullText) throw new Error('명함에서 텍스트를 인식하지 못했습니다.');
+  return parseCardText(fullText);
+}
+
+function parseCardText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // 이메일
+  const emailMatch = text.match(/[\w._%+\-]+@[\w.\-]+\.[a-zA-Z]{2,}/);
+  const email = emailMatch ? emailMatch[0] : '';
+
+  // 전화번호 (휴대폰 우선, 없으면 일반전화)
+  const mobileMatch = text.match(/0(?:10|11|16|17|18|19)[\s\-.]?\d{3,4}[\s\-.]?\d{4}/);
+  const telMatch    = text.match(/0(?:2|[3-9]\d)[\s\-.]?\d{3,4}[\s\-.]?\d{4}/);
+  const phone = (mobileMatch || telMatch || [''])[0].replace(/[\s.]/g, '-');
+
+  // 직함 키워드 매칭
+  const TITLES = ['대표이사','사장','부사장','전무이사','전무','상무이사','상무',
+    '이사','부장','차장','과장','대리','주임','사원','인턴',
+    '팀장','실장','본부장','센터장','수석','책임','선임','주임',
+    '매니저','Manager','Director','Leader','Partner',
+    'CEO','CTO','CFO','COO','VP'];
+  let title = '';
+  let titleLineIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (TITLES.some(t => lines[i].includes(t))) {
+      title = lines[i];
+      titleLineIdx = i;
+      break;
+    }
+  }
+
+  // 업체명 — 회사 관련 키워드 포함 줄 우선
+  const CO_KW = ['주식회사','(주)','유한회사','(유)','합자회사','그룹',
+    'Co.','Ltd.','Inc.','Corp.','LLC','솔루션','시스템','네트워크',
+    '기술','정보','소프트','서비스','컨설팅','파트너스'];
+  let company = '';
+  for (const line of lines) {
+    if (CO_KW.some(k => line.includes(k))) { company = line; break; }
+  }
+  // 못 찾으면 첫 번째 긴 줄
+  if (!company) {
+    company = lines.find(l => l.length >= 3 && l !== title) || '';
+  }
+
+  // 이름 — 2~4자 한글, 직함 줄 제외
+  const nameRe = /^[가-힣]{2,4}$/;
+  let name = '';
+  for (let i = 0; i < lines.length; i++) {
+    if (i === titleLineIdx) continue;
+    if (nameRe.test(lines[i])) { name = lines[i]; break; }
+  }
+  // 직함 줄 안에 이름이 포함된 경우 (예: "홍길동 부장")
+  if (!name && title) {
+    const m = title.match(/[가-힣]{2,4}/);
+    if (m) { name = m[0]; title = title.replace(name, '').trim(); }
+  }
+
+  return { company, name, title, phone, email, note: '' };
 }
 
 function fillScanForm(data) {
