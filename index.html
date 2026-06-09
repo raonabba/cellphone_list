@@ -317,6 +317,58 @@
       .stats { grid-template-columns: 1fr; }
     }
 
+    .btn-scan {
+      background: linear-gradient(135deg, #1a6b3c, #2e8b57);
+      color: #fff;
+    }
+
+    /* ── 명함 스캔 모달 ── */
+    #scan-overlay .modal { max-width: 480px; }
+
+    .scan-preview {
+      width: 100%;
+      border-radius: 10px;
+      object-fit: contain;
+      max-height: 220px;
+      background: #000;
+      display: none;
+      margin-bottom: 1rem;
+    }
+
+    .scan-drop {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 2rem 1rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: border-color .2s;
+      margin-bottom: 1rem;
+    }
+    .scan-drop:hover { border-color: var(--accent); }
+    .scan-drop .icon { font-size: 2.2rem; margin-bottom: 0.4rem; }
+
+    .scan-spinner {
+      display: none;
+      text-align: center;
+      padding: 1rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .scan-spinner::before {
+      content: '';
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin-right: 0.6rem;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     .loading {
       text-align: center;
       padding: 2rem;
@@ -367,6 +419,8 @@
     <div class="header-right">
       <span id="sync-status" style="font-size:.8rem;color:var(--text-muted)"></span>
       <button class="btn btn-secondary btn-sm" onclick="openAdd()">+ 추가</button>
+      <button class="btn btn-scan btn-sm" onclick="triggerScan()">📷 명함 스캔</button>
+      <input type="file" id="card-input" accept="image/*" capture="environment" style="display:none" onchange="onCardSelected(event)" />
       <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
     </div>
   </header>
@@ -466,6 +520,61 @@
   </div>
 </div>
 
+<!-- ────────────── 명함 스캔 모달 ────────────── -->
+<div class="modal-overlay" id="scan-overlay" onclick="closeScanOnBg(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeScan()">✕</button>
+    <h2>📷 명함 스캔</h2>
+    <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:1rem">명함 사진을 찍거나 선택하면 연락처가 자동으로 채워집니다.</p>
+
+    <div class="scan-drop" onclick="triggerScan()" id="scan-drop">
+      <div class="icon">📸</div>
+      <div>여기를 눌러 명함 촬영 / 사진 선택</div>
+      <div style="font-size:.78rem;margin-top:.4rem;opacity:.6">JPG · PNG · HEIC 지원</div>
+    </div>
+
+    <img id="scan-preview" class="scan-preview" alt="명함 미리보기" />
+
+    <div class="scan-spinner" id="scan-spinner">AI가 명함을 분석하는 중...</div>
+
+    <div id="scan-result" style="display:none">
+      <div style="color:var(--success);font-size:.88rem;margin-bottom:.8rem">✅ 인식 완료 — 내용을 확인하고 저장하세요.</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>업체명 *</label>
+          <input type="text" id="sc-company" />
+        </div>
+        <div class="field">
+          <label>담당자</label>
+          <input type="text" id="sc-name" />
+        </div>
+        <div class="field">
+          <label>직함</label>
+          <input type="text" id="sc-title" />
+        </div>
+        <div class="field">
+          <label>전화번호</label>
+          <input type="tel" id="sc-phone" />
+        </div>
+        <div class="field full">
+          <label>이메일</label>
+          <input type="email" id="sc-email" />
+        </div>
+        <div class="field full">
+          <label>비고</label>
+          <textarea id="sc-note" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeScan()">취소</button>
+        <button class="btn btn-success" onclick="saveScanResult()">저장</button>
+      </div>
+    </div>
+
+    <div id="scan-error" style="display:none;color:var(--danger);font-size:.85rem;margin-top:.5rem"></div>
+  </div>
+</div>
+
 <!-- ────────────── 삭제 확인 모달 ────────────── -->
 <div class="modal-overlay" id="del-overlay" onclick="closeDelOnBg(event)">
   <div class="modal" style="max-width:360px;text-align:center">
@@ -491,6 +600,9 @@ const TABLE = 'contacts';
 
 // 앱 비밀번호 (클라이언트 체크용)
 const APP_PASSWORD = 'cellphone1!';
+
+// Anthropic API 키 (명함 스캔용) — https://console.anthropic.com 에서 발급
+const ANTHROPIC_API_KEY = 'YOUR_ANTHROPIC_API_KEY';
 
 // ══════════════════════════════════════
 //  동의어 사전
@@ -790,6 +902,146 @@ async function confirmDelete() {
     setSyncStatus(`마지막 동기화: ${timeNow()}`);
   } catch(e) {
     toast('삭제 실패: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════
+//  명함 스캔
+// ══════════════════════════════════════
+function triggerScan() {
+  if (ANTHROPIC_API_KEY === 'YOUR_ANTHROPIC_API_KEY') {
+    toast('ANTHROPIC_API_KEY를 코드에 입력해 주세요.', 'error');
+    return;
+  }
+  document.getElementById('card-input').click();
+}
+
+function openScanModal() {
+  document.getElementById('scan-overlay').classList.add('open');
+  document.getElementById('scan-result').style.display = 'none';
+  document.getElementById('scan-error').style.display = 'none';
+  document.getElementById('scan-spinner').style.display = 'none';
+  document.getElementById('scan-preview').style.display = 'none';
+  document.getElementById('scan-drop').style.display = 'block';
+}
+
+function closeScan() { document.getElementById('scan-overlay').classList.remove('open'); }
+function closeScanOnBg(e) { if (e.target === document.getElementById('scan-overlay')) closeScan(); }
+
+async function onCardSelected(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+
+  openScanModal();
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const dataUrl = e.target.result;
+    const base64 = dataUrl.split(',')[1];
+    const mediaType = file.type || 'image/jpeg';
+
+    const preview = document.getElementById('scan-preview');
+    preview.src = dataUrl;
+    preview.style.display = 'block';
+    document.getElementById('scan-drop').style.display = 'none';
+    document.getElementById('scan-spinner').style.display = 'block';
+    document.getElementById('scan-error').style.display = 'none';
+
+    try {
+      const result = await callClaudeVision(base64, mediaType);
+      fillScanForm(result);
+      document.getElementById('scan-spinner').style.display = 'none';
+      document.getElementById('scan-result').style.display = 'block';
+    } catch(err) {
+      document.getElementById('scan-spinner').style.display = 'none';
+      const errEl = document.getElementById('scan-error');
+      errEl.textContent = '인식 실패: ' + err.message;
+      errEl.style.display = 'block';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function callClaudeVision(base64, mediaType) {
+  const prompt = `이 명함 이미지에서 연락처 정보를 추출해서 아래 JSON 형식으로만 응답해주세요.
+없는 항목은 빈 문자열로 두세요.
+{
+  "company": "업체명",
+  "name": "담당자 이름",
+  "title": "직함/직위",
+  "phone": "대표 전화번호 (휴대폰 우선)",
+  "email": "이메일",
+  "note": "기타 특이사항 (있을 경우만)"
+}
+JSON만 출력하고 다른 텍스트는 쓰지 마세요.`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-client-side-api-key-access': 'my-application',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  const data = await res.json();
+  const text = data.content[0].text.trim();
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('JSON 파싱 실패');
+  return JSON.parse(jsonMatch[0]);
+}
+
+function fillScanForm(data) {
+  document.getElementById('sc-company').value = data.company || '';
+  document.getElementById('sc-name').value    = data.name    || '';
+  document.getElementById('sc-title').value   = data.title   || '';
+  document.getElementById('sc-phone').value   = data.phone   || '';
+  document.getElementById('sc-email').value   = data.email   || '';
+  document.getElementById('sc-note').value    = data.note    || '';
+}
+
+async function saveScanResult() {
+  const company = document.getElementById('sc-company').value.trim();
+  if (!company) { toast('업체명을 입력해 주세요.', 'error'); return; }
+  if (!supabaseReady) { toast('Supabase 설정 후 사용 가능합니다.', 'error'); return; }
+
+  const data = {
+    company,
+    name:       document.getElementById('sc-name').value.trim(),
+    title:      document.getElementById('sc-title').value.trim(),
+    phone:      document.getElementById('sc-phone').value.trim(),
+    email:      document.getElementById('sc-email').value.trim(),
+    note:       document.getElementById('sc-note').value.trim(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    const result = await insertContact(data);
+    if (result && result[0]) allContacts.push(result[0]);
+    closeScan();
+    onSearch();
+    setSyncStatus(`마지막 동기화: ${timeNow()}`);
+    toast('명함 저장 완료!', 'success');
+  } catch(e) {
+    toast('저장 실패: ' + e.message, 'error');
   }
 }
 
