@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>파트너사 연락처</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --surface2: #0f3460;
+      --accent: #e94560;
+      --accent2: #533483;
+      --text: #e0e0e0;
+      --text-muted: #8892a4;
+      --border: #2a2a4a;
+      --success: #4caf50;
+      --danger: #f44336;
+      --warning: #ff9800;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── 로그인 ── */
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .login-card h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+      background: linear-gradient(135deg, #e94560, #533483);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .login-card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem; }
+
+    .field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.2rem; }
+    .field label { font-size: 0.85rem; color: var(--text-muted); }
+
+    input[type="password"], input[type="text"], input[type="email"], input[type="tel"], textarea, select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 0.65rem 0.9rem;
+      width: 100%;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 0.65rem 1.2rem;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:hover { opacity: .88; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #e94560, #533483);
+      color: #fff;
+      width: 100%;
+      padding: 0.8rem;
+      font-size: 1rem;
+    }
+
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+    .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+
+    .login-error {
+      color: var(--danger);
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      display: none;
+    }
+
+    /* ── 메인 레이아웃 ── */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .header-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #e94560, #533483);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      white-space: nowrap;
+    }
+
+    .header-right { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+
+    main { flex: 1; padding: 1.5rem; max-width: 1400px; margin: 0 auto; width: 100%; }
+
+    /* ── 검색바 ── */
+    .search-bar {
+      display: flex;
+      gap: 0.8rem;
+      margin-bottom: 1.2rem;
+      flex-wrap: wrap;
+    }
+
+    .search-bar input {
+      flex: 1;
+      min-width: 200px;
+      padding: 0.7rem 1rem;
+      font-size: 1rem;
+    }
+
+    /* ── 통계 카드 ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem 1.3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .stat-card .label { font-size: 0.8rem; color: var(--text-muted); }
+    .stat-card .value { font-size: 1.8rem; font-weight: 700; }
+    .stat-card .value.accent { color: var(--accent); }
+    .stat-card .value.green  { color: var(--success); }
+    .stat-card .value.blue   { color: #4fc3f7; }
+
+    /* ── 테이블 래퍼 ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .table-toolbar {
+      padding: 0.9rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .table-toolbar span { font-size: 0.9rem; color: var(--text-muted); }
+
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px;
+    }
+
+    thead th {
+      background: var(--surface2);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,.03); }
+
+    td {
+      padding: 0.75rem 1rem;
+      font-size: 0.88rem;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+
+    td.actions { white-space: nowrap; display: flex; gap: 0.4rem; align-items: center; }
+
+    .badge {
+      display: inline-block;
+      background: var(--surface2);
+      border-radius: 4px;
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      color: #aab;
+    }
+
+    /* ── 모달 ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 1.8rem;
+      position: relative;
+    }
+
+    .modal h2 { font-size: 1.2rem; margin-bottom: 1.4rem; }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-close:hover { color: var(--text); }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    @media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
+
+    .field.full { grid-column: 1 / -1; }
+
+    .modal-footer { display: flex; justify-content: flex-end; gap: 0.8rem; margin-top: 1.4rem; }
+
+    /* ── 토스트 ── */
+    #toast {
+      position: fixed;
+      bottom: 1.5rem; right: 1.5rem;
+      background: #333;
+      color: #fff;
+      padding: 0.8rem 1.2rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      opacity: 0;
+      transition: opacity .3s;
+      z-index: 9999;
+      pointer-events: none;
+      max-width: 300px;
+    }
+    #toast.show { opacity: 1; }
+    #toast.success { background: var(--success); }
+    #toast.error   { background: var(--danger); }
+
+    /* ── 반응형 ── */
+    @media (max-width: 640px) {
+      header { padding: 0.8rem 1rem; }
+      main   { padding: 1rem; }
+      .stats { grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+      .stat-card { padding: 0.8rem; }
+      .stat-card .value { font-size: 1.4rem; }
+      .modal { padding: 1.2rem; }
+    }
+
+    @media (max-width: 400px) {
+      .stats { grid-template-columns: 1fr; }
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+    .empty .icon { font-size: 2.5rem; margin-bottom: 0.6rem; }
+
+    /* config banner */
+    #config-banner {
+      background: #4a2000;
+      border: 1px solid var(--warning);
+      border-radius: 8px;
+      color: var(--warning);
+      font-size: 0.85rem;
+      padding: 0.8rem 1rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ────────────── 로그인 ────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>파트너사 연락처</h1>
+    <p>팀 공유 연락처 관리 시스템</p>
+    <div class="field">
+      <label>비밀번호</label>
+      <input type="password" id="pw-input" placeholder="비밀번호 입력" />
+    </div>
+    <button class="btn btn-primary" onclick="doLogin()">로그인</button>
+    <p class="login-error" id="login-error">비밀번호가 올바르지 않습니다.</p>
+  </div>
+</div>
+
+<!-- ────────────── 메인 앱 ────────────── -->
+<div id="app">
+  <header>
+    <div class="header-title">📋 파트너사 연락처</div>
+    <div class="header-right">
+      <span id="sync-status" style="font-size:.8rem;color:var(--text-muted)"></span>
+      <button class="btn btn-secondary btn-sm" onclick="openAdd()">+ 추가</button>
+      <button class="btn btn-secondary btn-sm" onclick="logout()">로그아웃</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="config-banner">
+      ⚠️ Supabase 설정이 필요합니다. 아래 <strong>SUPABASE_URL</strong>과 <strong>SUPABASE_ANON_KEY</strong>를 코드 상단에 입력해 주세요.
+    </div>
+
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="🔍  업체명, 담당자, 전화, 이메일, 비고 검색..." oninput="onSearch()" />
+      <button class="btn btn-secondary" onclick="clearSearch()">초기화</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <span class="label">전체 연락처</span>
+        <span class="value accent" id="stat-total">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">검색 결과</span>
+        <span class="value green" id="stat-filtered">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">업체 수</span>
+        <span class="value blue" id="stat-companies">0</span>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-toolbar">
+        <span id="result-label">전체 연락처</span>
+        <button class="btn btn-success btn-sm" onclick="openAdd()">+ 새 연락처 추가</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>업체명</th>
+              <th>담당자</th>
+              <th>직함</th>
+              <th>전화번호</th>
+              <th>이메일</th>
+              <th>출처</th>
+              <th>비고</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody id="contacts-tbody">
+            <tr><td colspan="8" class="loading">데이터 불러오는 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ────────────── 추가/수정 모달 ────────────── -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnBg(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h2 id="modal-title">연락처 추가</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>업체명 *</label>
+        <input type="text" id="f-company" placeholder="예) (주)삼성전자" />
+      </div>
+      <div class="field">
+        <label>담당자</label>
+        <input type="text" id="f-name" placeholder="예) 홍길동" />
+      </div>
+      <div class="field">
+        <label>직함</label>
+        <input type="text" id="f-title" placeholder="예) 부장" />
+      </div>
+      <div class="field">
+        <label>전화번호</label>
+        <input type="tel" id="f-phone" placeholder="예) 010-1234-5678" />
+      </div>
+      <div class="field full">
+        <label>이메일</label>
+        <input type="email" id="f-email" placeholder="예) contact@company.com" />
+      </div>
+      <div class="field">
+        <label>출처</label>
+        <input type="text" id="f-source" placeholder="예) 전시회, 소개, 직접" />
+      </div>
+      <div class="field full">
+        <label>비고</label>
+        <textarea id="f-note" rows="3" placeholder="추가 메모..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveContact()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ────────────── 삭제 확인 모달 ────────────── -->
+<div class="modal-overlay" id="del-overlay" onclick="closeDelOnBg(event)">
+  <div class="modal" style="max-width:360px;text-align:center">
+    <h2 style="margin-bottom:.8rem">연락처 삭제</h2>
+    <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:1.5rem" id="del-msg"></p>
+    <div style="display:flex;gap:.8rem;justify-content:center">
+      <button class="btn btn-secondary" onclick="closeDel()">취소</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════
+//  ⚙️  Supabase 설정 (배포 전 반드시 입력)
+// ══════════════════════════════════════
+const SUPABASE_URL  = 'YOUR_SUPABASE_URL';   // 예) https://xxxx.supabase.co
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';
+const TABLE = 'contacts';
+
+// 앱 비밀번호 (클라이언트 체크용)
+const APP_PASSWORD = 'cellphone1!';
+
+// ══════════════════════════════════════
+//  동의어 사전
+// ══════════════════════════════════════
+const SYNONYMS = {
+  '서버': ['dell', 'hpe', 'hp', 'x86', 'supermicro', 'lenovo', 'fujitsu', 'server', '서버'],
+  '네트워크': ['cisco', 'juniper', 'arista', 'paloalto', '네트워크', 'network', 'switch', 'router'],
+  '보안': ['fortinet', 'check point', 'symantec', 'trendmicro', '보안', 'security', 'firewall', 'f5'],
+  '스토리지': ['netapp', 'emc', 'pure', 'infinidat', '스토리지', 'storage', 'nas', 'san'],
+  '클라우드': ['aws', 'azure', 'gcp', 'google cloud', '클라우드', 'cloud', 'saas'],
+  '소프트웨어': ['microsoft', 'oracle', 'sap', 'vmware', '소프트웨어', 'software', 'sw'],
+};
+
+// ══════════════════════════════════════
+//  상태
+// ══════════════════════════════════════
+let allContacts = [];
+let filtered    = [];
+let editingId   = null;
+let deleteId    = null;
+let supabaseReady = false;
+
+// ══════════════════════════════════════
+//  Supabase REST 헬퍼
+// ══════════════════════════════════════
+function sbHeaders(extra = {}) {
+  return {
+    'apikey': SUPABASE_ANON,
+    'Authorization': `Bearer ${SUPABASE_ANON}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+    ...extra
+  };
+}
+
+async function sbFetch(path, opts = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: sbHeaders(opts.headers || {}),
+    ...opts
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function fetchAll() {
+  return sbFetch(`${TABLE}?select=*&order=company.asc`);
+}
+
+async function insertContact(data) {
+  return sbFetch(TABLE, { method: 'POST', body: JSON.stringify(data) });
+}
+
+async function updateContact(id, data) {
+  return sbFetch(`${TABLE}?id=eq.${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  });
+}
+
+async function deleteContact(id) {
+  return sbFetch(`${TABLE}?id=eq.${id}`, { method: 'DELETE', headers: { Prefer: '' } });
+}
+
+// ══════════════════════════════════════
+//  로그인
+// ══════════════════════════════════════
+function doLogin() {
+  const pw = document.getElementById('pw-input').value;
+  if (pw === APP_PASSWORD) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initApp();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+
+document.getElementById('pw-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+function logout() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('pw-input').value = '';
+}
+
+// ══════════════════════════════════════
+//  앱 초기화
+// ══════════════════════════════════════
+async function initApp() {
+  if (SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+    document.getElementById('config-banner').style.display = 'block';
+    renderContacts([]);
+    updateStats([]);
+    return;
+  }
+  supabaseReady = true;
+  setSyncStatus('로드 중...');
+  try {
+    allContacts = await fetchAll();
+    filtered = [...allContacts];
+    renderContacts(filtered);
+    updateStats(filtered);
+    setSyncStatus(`마지막 동기화: ${timeNow()}`);
+  } catch(e) {
+    setSyncStatus('⚠️ 연결 실패');
+    toast('Supabase 연결 실패: ' + e.message, 'error');
+    renderContacts([]);
+  }
+}
+
+function setSyncStatus(msg) {
+  document.getElementById('sync-status').textContent = msg;
+}
+
+function timeNow() {
+  return new Date().toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' });
+}
+
+// ══════════════════════════════════════
+//  검색
+// ══════════════════════════════════════
+function expandKeywords(query) {
+  const lower = query.toLowerCase().trim();
+  const keywords = new Set([lower]);
+  for (const [key, syns] of Object.entries(SYNONYMS)) {
+    if (syns.some(s => lower.includes(s)) || lower.includes(key)) {
+      syns.forEach(s => keywords.add(s));
+      keywords.add(key);
+    }
+  }
+  return [...keywords];
+}
+
+function matchContact(c, keywords) {
+  const fields = [c.company, c.name, c.title, c.phone, c.email, c.source, c.note]
+    .map(v => (v || '').toLowerCase()).join(' ');
+  return keywords.some(k => fields.includes(k));
+}
+
+function onSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) {
+    filtered = [...allContacts];
+  } else {
+    const keywords = expandKeywords(q);
+    filtered = allContacts.filter(c => matchContact(c, keywords));
+  }
+  renderContacts(filtered);
+  updateStats(filtered);
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  onSearch();
+}
+
+// ══════════════════════════════════════
+//  렌더링
+// ══════════════════════════════════════
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderContacts(list) {
+  const tbody = document.getElementById('contacts-tbody');
+  if (!list || list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty">
+      <div class="icon">📭</div>
+      <div>${allContacts.length > 0 ? '검색 결과가 없습니다.' : '등록된 연락처가 없습니다.'}</div>
+    </td></tr>`;
+    document.getElementById('result-label').textContent = '연락처 없음';
+    return;
+  }
+  document.getElementById('result-label').textContent = `${list.length}개 연락처`;
+  tbody.innerHTML = list.map(c => `
+    <tr>
+      <td><strong>${esc(c.company)}</strong></td>
+      <td>${esc(c.name)}</td>
+      <td>${c.title ? `<span class="badge">${esc(c.title)}</span>` : ''}</td>
+      <td>${c.phone ? `<a href="tel:${esc(c.phone)}" style="color:#4fc3f7;text-decoration:none">${esc(c.phone)}</a>` : ''}</td>
+      <td>${c.email ? `<a href="mailto:${esc(c.email)}" style="color:#4fc3f7;text-decoration:none;font-size:.82rem">${esc(c.email)}</a>` : ''}</td>
+      <td>${c.source ? `<span class="badge">${esc(c.source)}</span>` : ''}</td>
+      <td style="max-width:180px;color:var(--text-muted);font-size:.82rem">${esc(c.note)}</td>
+      <td class="actions">
+        <button class="btn btn-secondary btn-sm" onclick="openEdit('${c.id}')">수정</button>
+        <button class="btn btn-danger btn-sm" onclick="openDelete('${c.id}','${esc(c.company)}')">삭제</button>
+      </td>
+    </tr>`).join('');
+}
+
+function updateStats(list) {
+  document.getElementById('stat-total').textContent    = allContacts.length;
+  document.getElementById('stat-filtered').textContent = list.length;
+  const companies = new Set(allContacts.map(c => c.company).filter(Boolean));
+  document.getElementById('stat-companies').textContent = companies.size;
+}
+
+// ══════════════════════════════════════
+//  추가 / 수정 모달
+// ══════════════════════════════════════
+function openAdd() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = '연락처 추가';
+  clearForm();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function openEdit(id) {
+  const c = allContacts.find(x => x.id === id);
+  if (!c) return;
+  editingId = id;
+  document.getElementById('modal-title').textContent = '연락처 수정';
+  document.getElementById('f-company').value = c.company || '';
+  document.getElementById('f-name').value    = c.name    || '';
+  document.getElementById('f-title').value   = c.title   || '';
+  document.getElementById('f-phone').value   = c.phone   || '';
+  document.getElementById('f-email').value   = c.email   || '';
+  document.getElementById('f-source').value  = c.source  || '';
+  document.getElementById('f-note').value    = c.note    || '';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function clearForm() {
+  ['f-company','f-name','f-title','f-phone','f-email','f-source','f-note']
+    .forEach(id => document.getElementById(id).value = '');
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+function closeModalOnBg(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
+
+async function saveContact() {
+  const company = document.getElementById('f-company').value.trim();
+  if (!company) { toast('업체명을 입력해 주세요.', 'error'); return; }
+
+  const data = {
+    company,
+    name:   document.getElementById('f-name').value.trim(),
+    title:  document.getElementById('f-title').value.trim(),
+    phone:  document.getElementById('f-phone').value.trim(),
+    email:  document.getElementById('f-email').value.trim(),
+    source: document.getElementById('f-source').value.trim(),
+    note:   document.getElementById('f-note').value.trim(),
+    updated_at: new Date().toISOString()
+  };
+
+  if (!supabaseReady) {
+    toast('Supabase 설정 후 사용 가능합니다.', 'error');
+    return;
+  }
+
+  try {
+    if (editingId) {
+      await updateContact(editingId, data);
+      const idx = allContacts.findIndex(c => c.id === editingId);
+      if (idx !== -1) allContacts[idx] = { ...allContacts[idx], ...data };
+      toast('수정 완료!', 'success');
+    } else {
+      data.created_at = new Date().toISOString();
+      const result = await insertContact(data);
+      if (result && result[0]) allContacts.push(result[0]);
+      toast('추가 완료!', 'success');
+    }
+    closeModal();
+    onSearch();
+    setSyncStatus(`마지막 동기화: ${timeNow()}`);
+  } catch(e) {
+    toast('저장 실패: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════
+//  삭제 모달
+// ══════════════════════════════════════
+function openDelete(id, company) {
+  deleteId = id;
+  document.getElementById('del-msg').textContent = `"${company}" 연락처를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`;
+  document.getElementById('del-overlay').classList.add('open');
+}
+
+function closeDel() { document.getElementById('del-overlay').classList.remove('open'); }
+function closeDelOnBg(e) { if (e.target === document.getElementById('del-overlay')) closeDel(); }
+
+async function confirmDelete() {
+  if (!supabaseReady) { toast('Supabase 설정 후 사용 가능합니다.', 'error'); return; }
+  try {
+    await deleteContact(deleteId);
+    allContacts = allContacts.filter(c => c.id !== deleteId);
+    closeDel();
+    onSearch();
+    toast('삭제 완료!', 'success');
+    setSyncStatus(`마지막 동기화: ${timeNow()}`);
+  } catch(e) {
+    toast('삭제 실패: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════
+//  토스트
+// ══════════════════════════════════════
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+</script>
+</body>
+</html>
