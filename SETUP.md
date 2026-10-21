@@ -77,9 +77,9 @@ python migrate.py
 
 | 항목 | 값 |
 |------|-----|
-| 비밀번호 | `cellphone1!` |
+| 비밀번호 | (`index.html`의 `APP_PASSWORD`에 직접 설정) |
 
-비밀번호 변경: `index.html` 내 `const APP_PASSWORD = 'cellphone1!';` 수정
+비밀번호 변경: `index.html` 내 `const APP_PASSWORD = 'YOUR_APP_PASSWORD';` 수정
 
 ## 동의어 확장 검색
 

@@ -1,8 +1,8 @@
 import json, uuid, requests
 from datetime import datetime, timezone
 
-SUPABASE_URL  = 'https://cqltpmmnyewlesiqcwoa.supabase.co'
-SUPABASE_ANON = 'sb_publishable_WC1CEOM11Y-DQ5gD45UKHQ_E8f0W-p6'
+SUPABASE_URL  = 'YOUR_SUPABASE_URL'
+SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY'
 
 raw = [
 ["빌포스트","전문범","이사","010-3481-6628","","#request-구매계약-bank","전자고지 관련"],
